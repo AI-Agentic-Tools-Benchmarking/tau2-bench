@@ -120,12 +120,22 @@ To provide your API keys, copy `.env.example` as `.env` and edit it to include y
 ### Run agent evaluation
 
 To run a test evaluation on only 5 tasks with 1 trial per task, run:
+Agent vLLM Server:
+```bash
+CUDA_VISIBLE_DEVICES=0python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen3-14B --enable-prefix-caching --gpu-memory-utilization 0.90 --block-size 16 --swap-space 16 --port 8000 --host 0.0.0.0  --enable-auto-tool-choice --tool-call-parser hermes
+```
+
+User vLLM server:
+```bash
+CUDA_VISIBLE_DEVICES=1 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen3-14B --enable-prefix-caching --gpu-memory-utilization 0.90 --block-size 16 --swap-space 16 --port 8020 --host 0.0.0.0  --enable-auto-tool-choice --tool-call-parser hermes
+```
+
+
 
 ```bash
-tau2 run \ 
---domain airline \
---agent-llm gpt-4.1 \
---user-llm gpt-4.1 \
+tau2 run --domain airline \
+--agent-llm hosted_vllm/Qwen/Qwen3-14B --agent-llm-args '{"temperature": 0.7, "api_base":"http://localhost:8000/v1"}' \
+--user-llm hosted_vllm/Qwen/Qwen3-14B --user-llm-args '{"temperature": 0.7, "api_base":"http://localhost:8020/v1"}' \
 --num-trials 1 \
 --num-tasks 5
 ```

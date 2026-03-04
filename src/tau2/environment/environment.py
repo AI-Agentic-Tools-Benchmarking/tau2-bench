@@ -396,6 +396,8 @@ class Environment:
             The response of the tool call.
         """
         error = False
+        ### ABHI: TOOL CALL STARTS
+        logger.info(f"\033[94m[Tool Call]\033[0m Requestor: \033[96m{message.requestor}\033[0m | Tool: \033[93m{message.name}\033[0m | Args: \033[93m{message.arguments}\033[0m")
         try:
             resp = self.make_tool_call(
                 message.name, requestor=message.requestor, **message.arguments
@@ -406,6 +408,8 @@ class Environment:
             error = True
         logger.debug(f"Response: {resp}")
         resp = self.to_json_str(resp)
+        logger.info(f"\033[94m[Tool Response]\033[0m \033[93m{message.name}\033[0m:\n\033[92m{resp}\033[0m")
+        ### ABHI: TOOL CALL ENDS
         return ToolMessage(
             id=message.id,
             content=resp,

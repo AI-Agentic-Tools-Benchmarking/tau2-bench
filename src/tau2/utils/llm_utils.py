@@ -89,15 +89,15 @@ def get_response_cost(response: ModelResponse) -> float:
     """
     Get the cost of the response from the litellm completion.
     """
-    response.model = _parse_ft_model_name(
-        response.model
-    )  # FIXME: Check Litellm, passing the model to completion_cost doesn't work.
-    try:
-        cost = completion_cost(completion_response=response)
-    except Exception as e:
-        logger.error(e)
-        return 0.0
-    return cost
+    # response.model = _parse_ft_model_name(
+    #     response.model
+    # )  # FIXME: Check Litellm, passing the model to completion_cost doesn't work.
+    # try:
+    #     cost = completion_cost(completion_response=response)
+    # except Exception as e:
+        # logger.error(e)
+    return 0.0
+    # return cost
 
 
 def get_response_usage(response: ModelResponse) -> Optional[dict]:
@@ -182,6 +182,7 @@ def generate(
     messages: list[Message],
     tools: Optional[list[Tool]] = None,
     tool_choice: Optional[str] = None,
+    caller: str = "Agent",
     **kwargs: Any,
 ) -> UserMessage | AssistantMessage:
     """
@@ -192,6 +193,7 @@ def generate(
         messages: The messages to send to the model.
         tools: The tools to use.
         tool_choice: The tool choice to use.
+        caller: The caller of the LLM (e.g. 'Agent', 'User', 'Evaluator').
         **kwargs: Additional arguments to pass to the model.
 
     Returns: A tuple containing the message and the cost.
@@ -206,6 +208,8 @@ def generate(
     if tools and tool_choice is None:
         tool_choice = "auto"
     try:
+        ### ABHI: LLM CALL STARTS
+        logger.info(f"\033[95m[LLM Call]\033[0m Caller: \033[93m{caller}\033[0m | Model: \033[96m{model}\033[0m")  
         response = completion(
             model=model,
             messages=litellm_messages,
@@ -213,6 +217,7 @@ def generate(
             tool_choice=tool_choice,
             **kwargs,
         )
+        ### ABHI: LLM CALL ENDS
     except Exception as e:
         logger.error(e)
         raise e
@@ -240,7 +245,21 @@ def generate(
         for tool_call in tool_calls
     ]
     tool_calls = tool_calls or None
-
+    if content:
+        base_color = "\033[92m" if caller == "Agent" else "\033[96m"
+        think_color = "\033[90m" 
+        reset = "\033[0m"
+        import re
+        parts = re.split(r"(<think>.*?</think>)", content, flags=re.DOTALL)
+        formatted_content = ""
+        for part in parts:
+            if part.startswith("<think>") and part.endswith("</think>"):
+                formatted_content += f"{think_color}{part}{reset}"
+            else:
+                formatted_content += f"{base_color}{part}{reset}"
+        logger.info(f"\033[95m[LLM Response Content]\033[0m [{caller}]:\n{formatted_content}")
+    if tool_calls:
+        logger.info(f"\033[95m[LLM Tool Calls]\033[0m [{caller}]: \033[93m{tool_calls}\033[0m")
     message = AssistantMessage(
         role="assistant",
         content=content,
