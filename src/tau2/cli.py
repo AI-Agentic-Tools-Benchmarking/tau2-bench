@@ -141,6 +141,12 @@ def add_run_args(parser):
         default=False,
         help="Enforce communication protocol rules (e.g., no mixed messages with text and tool calls). Default is False.",
     )
+    parser.add_argument(
+        "--in-memory",
+        action="store_true",
+        default=False,
+        help="Store loaded domain databases natively in RAM instead of backing them with SQLite DiskDicts",
+    )
 
 
 def main():
@@ -172,6 +178,7 @@ def main():
                 seed=args.seed,
                 log_level=args.log_level,
                 enforce_communication_protocol=args.enforce_communication_protocol,
+                in_memory=args.in_memory,
             )
         )
     )

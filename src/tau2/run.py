@@ -167,6 +167,7 @@ def run_domain(config: RunConfig) -> Results:
         seed=config.seed,
         log_level=config.log_level,
         enforce_communication_protocol=config.enforce_communication_protocol,
+        in_memory=config.in_memory,
     )
     metrics = compute_metrics(simulation_results)
     ConsoleDisplay.display_agent_metrics(metrics)
@@ -193,6 +194,7 @@ def run_tasks(
     seed: Optional[int] = 300,
     log_level: Optional[str] = "INFO",
     enforce_communication_protocol: bool = False,
+    in_memory: bool = False,
 ) -> Results:
     """
     Runs tasks for a given domain.
@@ -368,6 +370,7 @@ def run_tasks(
                 evaluation_type=evaluation_type,
                 seed=seed,
                 enforce_communication_protocol=enforce_communication_protocol,
+                in_memory=in_memory,
             )
             simulation.trial = trial
             if console_display:
@@ -415,6 +418,7 @@ def run_task(
     evaluation_type: EvaluationType = EvaluationType.ALL,
     seed: Optional[int] = None,
     enforce_communication_protocol: bool = False,
+    in_memory: bool = False,
 ) -> SimulationRun:
     """
     Runs tasks for a given domain.
@@ -447,7 +451,11 @@ def run_task(
         f"STARTING SIMULATION: Domain: {domain}, Task: {task.id}, Agent: {agent}, User: {user}"
     )
     environment_constructor = registry.get_env_constructor(domain)
-    environment = environment_constructor()
+    # inject the in_memory CLI argument, allowing defaults to work if unsupplied
+    try:
+        environment = environment_constructor(in_memory=in_memory)
+    except TypeError:
+        environment = environment_constructor()
     AgentConstructor = registry.get_agent_constructor(agent)
 
     solo_mode = False
@@ -468,7 +476,10 @@ def run_task(
         )
     elif issubclass(AgentConstructor, LLMSoloAgent):
         solo_mode = True
-        environment: Environment = environment_constructor(solo_mode=True)
+        try:
+            environment: Environment = environment_constructor(solo_mode=True, in_memory=in_memory)
+        except TypeError:
+            environment: Environment = environment_constructor(solo_mode=True)
         user_tools = environment.get_user_tools() if environment.user_tools else []
         agent = AgentConstructor(
             tools=environment.get_tools() + user_tools,

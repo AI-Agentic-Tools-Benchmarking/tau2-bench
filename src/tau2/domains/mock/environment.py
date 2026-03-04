@@ -16,7 +16,7 @@ from tau2.utils import load_file
 
 
 def get_environment(
-    db: Optional[MockDB] = None, solo_mode: bool = False
+    db: Optional[MockDB] = None, solo_mode: bool = False, in_memory: bool = False,
 ) -> Environment:
     if db is None:
         db = MockDB.load(MOCK_DB_PATH)

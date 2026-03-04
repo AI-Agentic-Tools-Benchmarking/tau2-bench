@@ -18,11 +18,12 @@ from tau2.utils import load_file
 def get_environment(
     db: Optional[RetailDB] = None,
     solo_mode: bool = False,
+    in_memory: bool = False,
 ) -> Environment:
     if solo_mode:
         raise ValueError("Retail domain does not support solo mode")
     if db is None:
-        db = RetailDB.load(RETAIL_DB_PATH)
+        db = RetailDB.load(RETAIL_DB_PATH, in_memory=in_memory)
     tools = RetailTools(db)
     with open(RETAIL_POLICY_PATH, "r") as fp:
         policy = fp.read()

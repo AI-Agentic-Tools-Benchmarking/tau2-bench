@@ -7,6 +7,10 @@ from pydantic import Field
 from tau2.domains.telecom.utils import TELECOM_DB_PATH
 from tau2.environment.db import DB
 from tau2.utils.pydantic_utils import BaseModelNoExtra
+from pydantic import ConfigDict
+from tau2.environment.disk_dict import DiskList
+from tau2.object_info import print_object_report
+from tau2.utils import load_file
 
 DEFAULT_START_DATE = datetime.date(2025, 1, 1)
 
@@ -211,19 +215,21 @@ class Customer(BaseModelNoExtra):
 class TelecomDB(DB):
     """Database interface for telecom domain."""
 
-    plans: List[Plan] = Field(
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    plans: Any = Field(
         default_factory=list, description="Available service plans"
     )
-    customers: List[Customer] = Field(
+    customers: Any = Field(
         default_factory=list, description="All customers in the system"
     )
-    lines: List[Line] = Field(
+    lines: Any = Field(
         default_factory=list, description="All lines in the system"
     )
-    bills: List[Bill] = Field(
+    bills: Any = Field(
         default_factory=list, description="All bills in the system"
     )
-    devices: List[Device] = Field(
+    devices: Any = Field(
         default_factory=list, description="All devices in the system"
     )
 
@@ -248,11 +254,57 @@ class TelecomDB(DB):
         }
 
 
-def get_db():
+    @classmethod
+    def load(cls, path: str, in_memory: bool = False) -> "TelecomDB":
+        if in_memory:
+            sqlite_path = f"{path}.sqlite"
+            
+            plans_list = DiskList(sqlite_path, "plans", Plan)
+            customers_list = DiskList(sqlite_path, "customers", Customer)
+            lines_list = DiskList(sqlite_path, "lines", Line)
+            bills_list = DiskList(sqlite_path, "bills", Bill)
+            devices_list = DiskList(sqlite_path, "devices", Device)
+
+            if len(plans_list) == 0 and len(customers_list) == 0 and len(lines_list) == 0:
+                data = load_file(path)
+                    
+                for plan_data in data.get("plans", []):
+                    plans_list.append(Plan.model_validate(plan_data))
+                for cust_data in data.get("customers", []):
+                    customers_list.append(Customer.model_validate(cust_data))
+                for line_data in data.get("lines", []):
+                    lines_list.append(Line.model_validate(line_data))
+                for bill_data in data.get("bills", []):
+                    bills_list.append(Bill.model_validate(bill_data))
+                for dev_data in data.get("devices", []):
+                    devices_list.append(Device.model_validate(dev_data))
+
+            return cls.model_construct(
+                plans=plans_list,
+                customers=customers_list,
+                lines=lines_list,
+                bills=bills_list,
+                devices=devices_list,
+            )
+        else:
+            data = load_file(path)
+            
+            data["plans"] = [Plan.model_validate(d) for d in data.get("plans", [])]
+            data["customers"] = [Customer.model_validate(d) for d in data.get("customers", [])]
+            data["lines"] = [Line.model_validate(d) for d in data.get("lines", [])]
+            data["bills"] = [Bill.model_validate(d) for d in data.get("bills", [])]
+            data["devices"] = [Device.model_validate(d) for d in data.get("devices", [])]
+            return cls.model_construct(**data)
+
+
+def get_db(in_memory: bool = False):
     """Get an instance of the telecom database."""
-    return TelecomDB.load(TELECOM_DB_PATH)
+    return TelecomDB.load(TELECOM_DB_PATH, in_memory=in_memory)
 
 
 if __name__ == "__main__":
-    db = get_db()
+    db = get_db(True)
+    print_object_report(db, "TelecomDB")
+    db = get_db(False)
+    print_object_report(db, "TelecomDB")
     print(db.get_statistics())

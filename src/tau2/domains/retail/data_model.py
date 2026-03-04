@@ -4,6 +4,10 @@ from pydantic import BaseModel, Field
 
 from tau2.domains.retail.utils import RETAIL_DB_PATH
 from tau2.environment.db import DB
+from pydantic import ConfigDict
+from tau2.environment.disk_dict import DiskDict
+from tau2.object_info import print_object_report
+from tau2.utils import load_file
 
 
 class Variant(BaseModel):
@@ -208,13 +212,15 @@ class Order(BaseModel):
 class RetailDB(DB):
     """Database containing all retail-related data including products, users and orders"""
 
-    products: Dict[str, Product] = Field(
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    products: Any = Field(
         description="Dictionary of all products indexed by product ID"
     )
-    users: Dict[str, User] = Field(
+    users: Any = Field(
         description="Dictionary of all users indexed by user ID"
     )
-    orders: Dict[str, Order] = Field(
+    orders: Any = Field(
         description="Dictionary of all orders indexed by order ID"
     )
 
@@ -234,10 +240,57 @@ class RetailDB(DB):
         }
 
 
-def get_db():
-    return RetailDB.load(RETAIL_DB_PATH)
+    @classmethod
+    def load(cls, path: str, in_memory: bool = False) -> "RetailDB":
+        if in_memory:
+            sqlite_path = f"{path}.sqlite"
+            
+            # Initialize DiskDict instances pointing to the separate tables
+            products_dict = DiskDict(sqlite_path, "products", Product)
+            users_dict = DiskDict(sqlite_path, "users", User)
+            orders_dict = DiskDict(sqlite_path, "orders", Order)
+
+            # If the database is empty (or brand new), populate it from json
+            if len(products_dict) == 0 and len(users_dict) == 0 and len(orders_dict) == 0:
+                data = load_file(path)
+                    
+                for pid, pdata in data.get("products", {}).items():
+                    products_dict[pid] = Product.model_validate(pdata)
+                for uid, udata in data.get("users", {}).items():
+                    users_dict[uid] = User.model_validate(udata)
+                for oid, odata in data.get("orders", {}).items():
+                    orders_dict[oid] = Order.model_validate(odata)
+
+            return cls.model_construct(
+                products=products_dict,
+                users=users_dict,
+                orders=orders_dict,
+            )
+        else:
+            data = load_file(path)
+            
+            data["products"] = {
+                pid: Product.model_validate(pdata) 
+                for pid, pdata in data.get("products", {}).items()
+            }
+            data["users"] = {
+                uid: User.model_validate(udata) 
+                for uid, udata in data.get("users", {}).items()
+            }
+            data["orders"] = {
+                oid: Order.model_validate(odata) 
+                for oid, odata in data.get("orders", {}).items()
+            }
+            return cls.model_construct(**data)
+
+
+def get_db(in_memory: bool = False):
+    return RetailDB.load(RETAIL_DB_PATH, in_memory=in_memory)
 
 
 if __name__ == "__main__":
-    db = get_db()
+    db = get_db(True)
+    print_object_report(db, "RetailDB")
+    db = get_db(False)
+    print_object_report(db, "RetailDB")
     print(db.get_statistics())

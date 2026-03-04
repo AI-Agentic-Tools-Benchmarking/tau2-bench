@@ -167,6 +167,13 @@ class RunConfig(BaseModel):
             default=False,
         ),
     ]
+    in_memory: Annotated[
+        bool,
+        Field(
+            description="Whether to force SQLite fallback DiskDict retrieval",
+            default=False,
+        ),
+    ]
 
     def validate(self) -> None:
         """

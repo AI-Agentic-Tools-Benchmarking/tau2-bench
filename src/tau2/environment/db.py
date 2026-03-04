@@ -4,6 +4,8 @@ from tau2.utils import dump_file, get_pydantic_hash, load_file
 from tau2.utils.pydantic_utils import BaseModelNoExtra
 
 
+_cached_dbs: dict[tuple[type, str], "DB"] = {}
+
 class DB(BaseModelNoExtra):
     """Domain database.
 
@@ -11,8 +13,14 @@ class DB(BaseModelNoExtra):
     """
 
     @classmethod
-    def load(cls, path: str) -> "DB":
+    def load(cls, path: str, in_memory: bool = False) -> "DB":
         """Load the database from a structured file like JSON, YAML, or TOML."""
+        if in_memory:
+            cache_key = (cls, path)
+            if cache_key not in _cached_dbs:
+                data = load_file(path)
+                _cached_dbs[cache_key] = cls.model_validate(data)
+            return _cached_dbs[cache_key]
         data = load_file(path)
         return cls.model_validate(data)
 

@@ -17,11 +17,12 @@ from tau2.utils import load_file
 def get_environment(
     db: Optional[FlightDB] = None,
     solo_mode: bool = False,
+    in_memory: bool = False,
 ) -> Environment:
     if solo_mode:
         raise ValueError("Airline domain does not support solo mode")
     if db is None:
-        db = FlightDB.load(AIRLINE_DB_PATH)
+        db = FlightDB.load(AIRLINE_DB_PATH, in_memory=in_memory)
     tools = AirlineTools(db)
     with open(AIRLINE_POLICY_PATH, "r") as fp:
         policy = fp.read()

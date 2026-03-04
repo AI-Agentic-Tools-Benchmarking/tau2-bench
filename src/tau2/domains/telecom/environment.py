@@ -98,9 +98,10 @@ def get_environment(
     user_db: Optional[TelecomUserDB] = None,
     solo_mode: bool = False,
     policy_type: str = "manual",  # "manual" or "workflow"
+    in_memory: bool = False,
 ) -> TelecomEnvironment:
     if db is None:
-        db = TelecomDB.load(TELECOM_DB_PATH)
+        db = TelecomDB.load(TELECOM_DB_PATH, in_memory=in_memory)
     tools = TelecomTools(db)
     if user_db is None:
         user_db = TelecomUserDB.load(TELECOM_USER_DB_PATH)

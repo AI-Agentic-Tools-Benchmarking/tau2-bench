@@ -1,9 +1,11 @@
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from tau2.domains.airline.utils import AIRLINE_DB_PATH
 from tau2.environment.db import DB
+from tau2.object_info import print_object_report
+import sys
 
 FlightType = Literal["round_trip", "one_way"]
 CabinClass = Literal["business", "economy", "basic_economy"]
@@ -248,16 +250,52 @@ class Reservation(BaseModel):
 
 class FlightDB(DB):
     """Database of all flights, users, and reservations."""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    flights: Dict[str, Flight] = Field(
+    flights: Any = Field(
         description="Dictionary of all flights indexed by flight number"
     )
-    users: Dict[str, User] = Field(
+    users: Any = Field(
         description="Dictionary of all users indexed by user ID"
     )
-    reservations: Dict[str, Reservation] = Field(
+    reservations: Any = Field(
         description="Dictionary of all reservations indexed by reservation ID"
     )
+
+    @classmethod
+    def load(cls, path: str, in_memory: bool = False) -> "FlightDB":
+        from tau2.environment.disk_dict import DiskDict
+        from tau2.utils import load_file
+        
+        if in_memory:
+            sqlite_path = str(path) + ".sqlite"
+            
+            flights_disk = DiskDict(sqlite_path, "flights", Flight)
+            users_disk = DiskDict(sqlite_path, "users", User)
+            reservations_disk = DiskDict(sqlite_path, "reservations", Reservation)
+            
+            # If the database is empty, populate from JSON
+            if len(flights_disk) == 0:
+                data = load_file(path)
+                for k, v in data.get("flights", {}).items():
+                    flights_disk[k] = Flight.model_validate(v)
+                for k, v in data.get("users", {}).items():
+                    users_disk[k] = User.model_validate(v)
+                for k, v in data.get("reservations", {}).items():
+                    reservations_disk[k] = Reservation.model_validate(v)
+                    
+            return cls.model_construct(
+                flights=flights_disk,
+                users=users_disk,
+                reservations=reservations_disk
+            )
+
+        data = load_file(path)
+        return cls.model_construct(
+            flights={k: Flight.model_validate(v) for k, v in data.get("flights", {}).items()},
+            users={k: User.model_validate(v) for k, v in data.get("users", {}).items()},
+            reservations={k: Reservation.model_validate(v) for k, v in data.get("reservations", {}).items()}
+        )
 
     def get_statistics(self) -> dict[str, Any]:
         """Get the statistics of the database."""
@@ -275,10 +313,13 @@ class FlightDB(DB):
         }
 
 
-def get_db():
-    return FlightDB.load(AIRLINE_DB_PATH)
+def get_db(in_memory: bool = False):
+    return FlightDB.load(AIRLINE_DB_PATH, in_memory=in_memory)
 
 
 if __name__ == "__main__":
-    db = get_db()
+    db = get_db(True)
+    print_object_report(db, "FlightDB")
+    db = get_db(False)
+    print_object_report(db, "FlightDB")
     print(db.get_statistics())
