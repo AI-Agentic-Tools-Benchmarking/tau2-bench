@@ -1,5 +1,6 @@
 import json
 from copy import deepcopy
+import time
 from datetime import date, datetime
 from typing import Any, Literal, Optional
 
@@ -398,6 +399,7 @@ class Environment:
         error = False
         ### ABHI: TOOL CALL STARTS
         logger.info(f"\033[94m[Tool Call]\033[0m Requestor: \033[96m{message.requestor}\033[0m | Tool: \033[93m{message.name}\033[0m | Args: \033[93m{message.arguments}\033[0m")
+        start_time = time.perf_counter_ns()
         try:
             resp = self.make_tool_call(
                 message.name, requestor=message.requestor, **message.arguments
@@ -406,9 +408,11 @@ class Environment:
         except Exception as e:
             resp = f"Error: {e}"
             error = True
+        tool_duration = time.perf_counter_ns() - start_time
         logger.debug(f"Response: {resp}")
         resp = self.to_json_str(resp)
         logger.info(f"\033[94m[Tool Response]\033[0m \033[93m{message.name}\033[0m:\n\033[92m{resp}\033[0m")
+        logger.info(f"\033[94m[Tool Response Duration]\033[0m \033[93m{message.name}\033[0m: {tool_duration/1e6:.2f} ms")
         ### ABHI: TOOL CALL ENDS
         return ToolMessage(
             id=message.id,
@@ -416,4 +420,5 @@ class Environment:
             requestor=message.requestor,
             role="tool",
             error=error,
+            duration=tool_duration/1e9,
         )

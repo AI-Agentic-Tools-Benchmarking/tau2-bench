@@ -345,6 +345,21 @@ class SimulationRun(BaseModel):
     user_cost: Optional[float] = Field(
         description="The cost of the user.", default=None
     )
+    agent_llm_duration: Optional[float] = Field(
+        description="The total duration of all LLM calls made by the agent.", default=None
+    )
+    user_llm_duration: Optional[float] = Field(
+        description="The total duration of all LLM calls made by the user.", default=None
+    )
+    agent_duration: Optional[float] = Field(
+        description="The total duration of all agent calls.", default=None
+    )
+    user_duration: Optional[float] = Field(
+        description="The total duration of all user calls.", default=None
+    )
+    tool_duration: Optional[float] = Field(
+        description="The total duration of all tool calls.", default=None
+    )
     reward_info: Optional[RewardInfo] = Field(
         description="The reward received by the agent.", default=None
     )
@@ -432,6 +447,11 @@ class Results(BaseModel):
                 "reward": sim.reward_info.reward,
                 "agent_cost": sim.agent_cost,
                 "user_cost": sim.user_cost,
+                "agent_llm_duration": sim.agent_llm_duration,
+                "user_llm_duration": sim.user_llm_duration,
+                "agent_duration": sim.agent_duration,
+                "user_duration": sim.user_duration,
+                "tool_duration": sim.tool_duration,
                 "termination_reason": sim.termination_reason,
                 "duration": sim.duration,
                 "num_messages": len(sim.messages),

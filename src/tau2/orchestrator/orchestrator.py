@@ -431,6 +431,12 @@ class Orchestrator:
             agent_cost, user_cost = None, None
         else:
             agent_cost, user_cost = res
+        agent_llm_duration = sum(msg.llm_duration for msg in messages if isinstance(msg, AssistantMessage) and getattr(msg, "llm_duration", None) is not None)
+        user_llm_duration = sum(msg.llm_duration for msg in messages if isinstance(msg, UserMessage) and getattr(msg, "llm_duration", None) is not None)
+        agent_duration = sum(msg.duration for msg in messages if isinstance(msg, AssistantMessage) and getattr(msg, "duration", None) is not None)
+        user_duration = sum(msg.duration for msg in messages if isinstance(msg, UserMessage) and getattr(msg, "duration", None) is not None)
+        tool_duration = sum(msg.duration for msg in messages if isinstance(msg, ToolMessage) and getattr(msg, "duration", None) is not None)
+
         simulation_run = SimulationRun(
             id=str(uuid.uuid4()),
             task_id=self.task.id,
@@ -441,6 +447,11 @@ class Orchestrator:
             reward_info=None,
             user_cost=user_cost,
             agent_cost=agent_cost,
+            agent_llm_duration=agent_llm_duration,
+            user_llm_duration=user_llm_duration,
+            agent_duration=agent_duration,
+            user_duration=user_duration,
+            tool_duration=tool_duration,
             messages=messages,
             seed=self.seed,
         )
@@ -463,9 +474,11 @@ class Orchestrator:
         )
         # AGENT/ENV -> USER
         if self.from_role in [Role.AGENT, Role.ENV] and self.to_role == Role.USER:
+            start_time = time.perf_counter()
             user_msg, self.user_state = self.user.generate_next_message(
                 self.message, self.user_state
             )
+            user_msg.duration = time.perf_counter() - start_time
             user_msg.validate()
             if UserSimulator.is_stop(user_msg):
                 self.done = True
@@ -481,9 +494,11 @@ class Orchestrator:
         elif (
             self.from_role == Role.USER or self.from_role == Role.ENV
         ) and self.to_role == Role.AGENT:
+            start_time = time.perf_counter()
             agent_msg, self.agent_state = self.agent.generate_next_message(
                 self.message, self.agent_state
             )
+            agent_msg.duration = time.perf_counter() - start_time
             agent_msg.validate()
             if self.agent.is_stop(agent_msg):
                 self.done = True

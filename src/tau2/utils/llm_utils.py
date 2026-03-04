@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from typing import Any, Optional
 
 import litellm
@@ -210,6 +211,7 @@ def generate(
     try:
         ### ABHI: LLM CALL STARTS
         logger.info(f"\033[95m[LLM Call]\033[0m Caller: \033[93m{caller}\033[0m | Model: \033[96m{model}\033[0m")  
+        start_time = time.perf_counter()
         response = completion(
             model=model,
             messages=litellm_messages,
@@ -217,6 +219,7 @@ def generate(
             tool_choice=tool_choice,
             **kwargs,
         )
+        llm_duration = time.perf_counter() - start_time
         ### ABHI: LLM CALL ENDS
     except Exception as e:
         logger.error(e)
@@ -258,6 +261,7 @@ def generate(
             else:
                 formatted_content += f"{base_color}{part}{reset}"
         logger.info(f"\033[95m[LLM Response Content]\033[0m [{caller}]:\n{formatted_content}")
+        logger.info(f"\033[95m[LLM Response Duration]\033[0m [{caller}]: {llm_duration:.2f} seconds")
     if tool_calls:
         logger.info(f"\033[95m[LLM Tool Calls]\033[0m [{caller}]: \033[93m{tool_calls}\033[0m")
     message = AssistantMessage(
@@ -267,6 +271,7 @@ def generate(
         cost=cost,
         usage=usage,
         raw_data=response.to_dict(),
+        llm_duration=llm_duration,
     )
     return message
 

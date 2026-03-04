@@ -107,6 +107,12 @@ class ParticipantMessageBase(BaseModel):
     raw_data: Optional[dict] = Field(
         description="The raw data of the message.", default=None
     )
+    llm_duration: Optional[float] = Field(
+        description="The duration of the LLM call.", default=None
+    )
+    duration: Optional[float] = Field(
+        description="The total duration of the turn.", default=None
+    )
 
     def validate(self):  # NOTE: It would be better to do this in the Pydantic model
         """
@@ -192,6 +198,9 @@ class ToolMessage(BaseModel):
     )
     timestamp: Optional[str] = Field(
         description="The timestamp of the message.", default_factory=get_now
+    )
+    duration: Optional[float] = Field(
+        description="The duration of the tool call.", default=None
     )
 
     def __str__(self) -> str:

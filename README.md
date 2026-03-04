@@ -122,7 +122,7 @@ To provide your API keys, copy `.env.example` as `.env` and edit it to include y
 To run a test evaluation on only 5 tasks with 1 trial per task, run:
 Agent vLLM Server:
 ```bash
-CUDA_VISIBLE_DEVICES=0python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen3-14B --enable-prefix-caching --gpu-memory-utilization 0.90 --block-size 16 --swap-space 16 --port 8000 --host 0.0.0.0  --enable-auto-tool-choice --tool-call-parser hermes
+CUDA_VISIBLE_DEVICES=0 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen3-14B --enable-prefix-caching --gpu-memory-utilization 0.90 --block-size 16 --swap-space 16 --port 8000 --host 0.0.0.0  --enable-auto-tool-choice --tool-call-parser hermes
 ```
 
 User vLLM server:
