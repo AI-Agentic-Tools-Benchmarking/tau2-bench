@@ -1,8 +1,15 @@
 import json
+import os
+import sys
 from copy import deepcopy
 import time
 from datetime import date, datetime
 from typing import Any, Literal, Optional
+
+_agent_ipc_dir = os.path.expanduser("~/agent-profiling/agent-benchmark")
+if _agent_ipc_dir not in sys.path:
+    sys.path.insert(0, _agent_ipc_dir)
+from agent_ipc import emit_exec_end, emit_exec_start
 
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -399,7 +406,13 @@ class Environment:
         error = False
         ### ABHI: TOOL CALL STARTS
         logger.info(f"\033[94m[Tool Call]\033[0m Requestor: \033[96m{message.requestor}\033[0m | Tool: \033[93m{message.name}\033[0m | Args: \033[93m{message.arguments}\033[0m")
+        exec_id = emit_exec_start(
+            exec_type=message.name,
+            step_name=f"exec:{message.name}",
+            action_sig=f"{message.name}({json.dumps(message.arguments, default=str)})",
+        )
         start_time = time.perf_counter_ns()
+        error_msg = ""
         try:
             resp = self.make_tool_call(
                 message.name, requestor=message.requestor, **message.arguments
@@ -408,7 +421,9 @@ class Environment:
         except Exception as e:
             resp = f"Error: {e}"
             error = True
+            error_msg = str(e)
         tool_duration = time.perf_counter_ns() - start_time
+        emit_exec_end(exec_id, success=not error, error=error_msg)
         logger.debug(f"Response: {resp}")
         resp = self.to_json_str(resp)
         logger.info(f"\033[94m[Tool Response]\033[0m \033[93m{message.name}\033[0m:\n\033[92m{resp}\033[0m")

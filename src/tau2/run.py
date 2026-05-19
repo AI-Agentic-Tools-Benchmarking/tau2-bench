@@ -1,9 +1,16 @@
 import json
 import multiprocessing
+import os
 import random
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
+
+_agent_ipc_dir = os.path.expanduser("~/agent-profiling/agent-benchmark")
+if _agent_ipc_dir not in sys.path:
+    sys.path.insert(0, _agent_ipc_dir)
+from agent_ipc import emit_exec_end, emit_exec_start
 
 from loguru import logger
 
@@ -377,8 +384,8 @@ def run_tasks(
                 ConsoleDisplay.display_simulation(simulation, show_details=False)
             _save(simulation)
         except Exception as e:
-            logger.error(f"Error running task {task.id}, trial {trial}: {e}")
-            raise e
+            logger.error(f"Error running task {task.id}, trial {trial} [{type(e).__name__}]: {e}")
+            return None
         return simulation
 
     args = []
@@ -395,7 +402,7 @@ def run_tasks(
             args.append((task, trial, seeds[trial], progress_str))
 
     with ThreadPoolExecutor(max_workers=max_concurrency) as executor:
-        res = list(executor.map(_run, *zip(*args)))
+        res = [r for r in executor.map(_run, *zip(*args)) if r is not None]
         simulation_results.simulations.extend(res)
     ConsoleDisplay.console.print(
         "\n✨ [bold green]Successfully completed all simulations![/bold green]\n"
@@ -515,6 +522,12 @@ def run_task(
         llm_args=llm_args_user,
     )
 
+    exec_id = emit_exec_start(
+        exec_type  = "simulation",
+        step_name  = f"sim:{task.id}",
+        node_id    = f"seed={seed}",
+        plan_goal  = str(task.user_scenario)[:200] if getattr(task, "user_scenario", None) else "",
+    )
     orchestrator = Orchestrator(
         domain=domain,
         agent=agent,
@@ -528,6 +541,12 @@ def run_task(
         validate_communication=enforce_communication_protocol,
     )
     simulation = orchestrator.run()
+    emit_exec_end(
+        exec_id,
+        success      = simulation.termination_reason not in ("agent_error", "user_error"),
+        steps_count  = len(simulation.messages),
+        extracted    = simulation.termination_reason,
+    )
 
     reward_info = evaluate_simulation(
         domain=domain,

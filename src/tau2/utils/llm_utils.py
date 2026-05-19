@@ -1,7 +1,14 @@
 import json
+import os
 import re
+import sys
 import time
 from typing import Any, Optional
+
+_agent_ipc_dir = os.path.expanduser("~/agent-profiling/agent-benchmark")
+if _agent_ipc_dir not in sys.path:
+    sys.path.insert(0, _agent_ipc_dir)
+from agent_ipc import emit_llm_end, emit_llm_start
 
 import litellm
 from litellm import completion, completion_cost
@@ -210,8 +217,14 @@ def generate(
         tool_choice = "auto"
     try:
         ### ABHI: LLM CALL STARTS
-        logger.info(f"\033[95m[LLM Call]\033[0m Caller: \033[93m{caller}\033[0m | Model: \033[96m{model}\033[0m")  
+        logger.info(f"\033[95m[LLM Call]\033[0m Caller: \033[93m{caller}\033[0m | Model: \033[96m{model}\033[0m")
         start_time = time.perf_counter()
+        call_id = emit_llm_start(
+            step_name=caller,
+            model_name=model,
+            system_prompt=next((str(m.get("content") or "") for m in litellm_messages if m.get("role") == "system"), ""),
+            user_prompt=next((str(m.get("content") or "") for m in reversed(litellm_messages) if m.get("role") == "user"), ""),
+        )
         response = completion(
             model=model,
             messages=litellm_messages,
@@ -220,6 +233,7 @@ def generate(
             **kwargs,
         )
         llm_duration = time.perf_counter() - start_time
+        emit_llm_end(call_id, usage=get_response_usage(response) or {}, step_name=caller, output_obj=response.choices[0].message.content)
         ### ABHI: LLM CALL ENDS
     except Exception as e:
         logger.error(e)

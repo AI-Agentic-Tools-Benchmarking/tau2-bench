@@ -1,5 +1,12 @@
+import os
+import sys
 from copy import deepcopy
 from typing import List, Optional
+
+_agent_ipc_dir = os.path.expanduser("~/agent-profiling/agent-benchmark")
+if _agent_ipc_dir not in sys.path:
+    sys.path.insert(0, _agent_ipc_dir)
+from agent_ipc import emit_step_end, emit_step_start
 
 from loguru import logger
 from pydantic import BaseModel
@@ -100,11 +107,13 @@ class LLMAgent(LocalAgent[LLMAgentState]):
         """
         Respond to a user or tool message.
         """
+        sid = emit_step_start(stage="pre", step_name="pre:agent", agent="agent", input_summary={"history_len": len(state.messages)})
         if isinstance(message, MultiToolMessage):
             state.messages.extend(message.tool_messages)
         else:
             state.messages.append(message)
         messages = state.system_messages + state.messages
+        emit_step_end(sid, output_summary={"messages_len": len(messages)})
         assistant_message = generate(
             model=self.llm,
             tools=self.tools,
@@ -112,7 +121,9 @@ class LLMAgent(LocalAgent[LLMAgentState]):
             caller="Agent",
             **self.llm_args,
         )
+        sid = emit_step_start(stage="post", step_name="post:agent", agent="agent", input_summary={"is_tool_call": assistant_message.is_tool_call()})
         state.messages.append(assistant_message)
+        emit_step_end(sid, output_summary={"tool_calls": len(assistant_message.tool_calls) if assistant_message.tool_calls else 0})
         return assistant_message, state
 
     def set_seed(self, seed: int):
@@ -229,11 +240,13 @@ class LLMGTAgent(LocalAgent[LLMAgentState]):
         """
         Respond to a user or tool message.
         """
+        sid = emit_step_start(stage="pre", step_name="pre:agent", agent="agent", input_summary={"history_len": len(state.messages)})
         if isinstance(message, MultiToolMessage):
             state.messages.extend(message.tool_messages)
         else:
             state.messages.append(message)
         messages = state.system_messages + state.messages
+        emit_step_end(sid, output_summary={"messages_len": len(messages)})
         assistant_message = generate(
             model=self.llm,
             tools=self.tools,
@@ -241,7 +254,9 @@ class LLMGTAgent(LocalAgent[LLMAgentState]):
             caller="Agent",
             **self.llm_args,
         )
+        sid = emit_step_start(stage="post", step_name="post:agent", agent="agent", input_summary={"is_tool_call": assistant_message.is_tool_call()})
         state.messages.append(assistant_message)
+        emit_step_end(sid, output_summary={"tool_calls": len(assistant_message.tool_calls) if assistant_message.tool_calls else 0})
         return assistant_message, state
 
     def set_seed(self, seed: int):
@@ -448,6 +463,7 @@ class LLMSoloAgent(LocalAgent[LLMAgentState]):
         """
         if isinstance(message, UserMessage):
             raise ValueError("LLMSoloAgent does not support user messages.")
+        sid = emit_step_start(stage="pre", step_name="pre:agent", agent="agent", input_summary={"history_len": len(state.messages)})
         if isinstance(message, MultiToolMessage):
             state.messages.extend(message.tool_messages)
         elif message is None:
@@ -455,6 +471,7 @@ class LLMSoloAgent(LocalAgent[LLMAgentState]):
         else:
             state.messages.append(message)
         messages = state.system_messages + state.messages
+        emit_step_end(sid, output_summary={"messages_len": len(messages)})
         assistant_message = generate(
             model=self.llm,
             tools=self.tools,
@@ -466,7 +483,9 @@ class LLMSoloAgent(LocalAgent[LLMAgentState]):
         if not assistant_message.is_tool_call():
             raise ValueError("LLMSoloAgent only supports tool calls.")
         message = self._check_if_stop_toolcall(assistant_message)
+        sid = emit_step_start(stage="post", step_name="post:agent", agent="agent", input_summary={"is_stop": self.is_stop(assistant_message)})
         state.messages.append(assistant_message)
+        emit_step_end(sid, output_summary={"tool_calls": len(assistant_message.tool_calls) if assistant_message.tool_calls else 0})
         return assistant_message, state
 
     def set_seed(self, seed: int):

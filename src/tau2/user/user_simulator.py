@@ -1,4 +1,11 @@
+import os
+import sys
 from typing import Optional, Tuple
+
+_agent_ipc_dir = os.path.expanduser("~/agent-profiling/agent-benchmark")
+if _agent_ipc_dir not in sys.path:
+    sys.path.insert(0, _agent_ipc_dir)
+from agent_ipc import emit_step_end, emit_step_start
 
 from loguru import logger
 
@@ -147,12 +154,14 @@ class UserSimulator(BaseUser):
         Returns:
             A tuple containing the user message and the updated user state.
         """
+        sid = emit_step_start(stage="pre", step_name="pre:user_sim", agent="user_sim", input_summary={"history_len": len(state.messages)})
         # Updating state with new message
         if isinstance(message, MultiToolMessage):
             state.messages.extend(message.tool_messages)
         else:
             state.messages.append(message)
         messages = state.system_messages + state.flip_roles()
+        emit_step_end(sid, output_summary={"messages_len": len(messages)})
 
         # Generate response
         assistant_message = generate(
@@ -163,6 +172,7 @@ class UserSimulator(BaseUser):
             **self.llm_args,
         )
 
+        sid = emit_step_start(stage="post", step_name="post:user_sim", agent="user_sim", input_summary={"has_tool_calls": assistant_message.tool_calls is not None})
         user_response = assistant_message.content
         logger.debug(f"Response: {user_response}")
 
@@ -190,6 +200,7 @@ class UserSimulator(BaseUser):
 
         # Updating state with response
         state.messages.append(user_message)
+        emit_step_end(sid, output_summary={"is_stop": UserSimulator.is_stop(user_message)})
         return user_message, state
 
 
